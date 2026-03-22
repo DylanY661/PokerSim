@@ -16,12 +16,12 @@ generate() is a helper function to call the Ollama local server's /api/generate 
 It takes care of formatting the request, handling errors, and parsing the response.
 The response is a JSON string containing the action, amount, and reasoning.
 """
-def generate(prompt, system_prompt=None, timeout=30, params=None):
+def generate(prompt, system_prompt=None, timeout=120, params=None, model=None):
     url = OLLAMA_URL.rstrip("/") + "/api/generate"
 
     # payload setup
     payload = {
-        "model": OLLAMA_MODEL,
+        "model": model or OLLAMA_MODEL,
         "prompt": prompt,
         "system": system_prompt, # Correct way to send system prompt in /api/generate
         "format": "json",

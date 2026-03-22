@@ -13,7 +13,6 @@ export async function getBrowserStatus() {
 }
 
 export async function initBrowser(players, signal) {
-  // Opens Chrome and sends system prompts — can take 1–2 minutes
   const payload = players && players.length > 0 ? { players } : {};
   const { data } = await axios.post(`${API_BASE}/browser/init`, payload, { timeout: 600_000, signal });
   return data;
@@ -44,11 +43,41 @@ export async function confirmLogin() {
   return data;
 }
 
-export async function playTurn(playerName, state, mode = 'browser') {
-  const { data } = await axios.post(`${API_BASE}/play-turn`, {
-    player_name: playerName,
-    state,
-    mode,
+// ── Game API ──────────────────────────────────────────────────────────────────
+
+export async function createGame({ playerCount, startingStack, aiMode, ollamaModel, actionSpeed }) {
+  const { data } = await axios.post(`${API_BASE}/games`, {
+    player_count:   playerCount,
+    starting_stack: startingStack,
+    ai_mode:        aiMode,
+    ollama_model:   ollamaModel || null,
+    action_speed:   actionSpeed / 1000,   // ms → seconds
   });
+  return data;   // { game_id }
+}
+
+export async function startNextRound(gameId) {
+  const { data } = await axios.post(`${API_BASE}/games/${gameId}/rounds/next`);
   return data;
+}
+
+export async function stopGame(gameId) {
+  const { data } = await axios.post(`${API_BASE}/games/${gameId}/stop`);
+  return data;
+}
+
+export async function listGames() {
+  const { data } = await axios.get(`${API_BASE}/games`);
+  return data;
+}
+
+export async function getGame(gameId) {
+  const { data } = await axios.get(`${API_BASE}/games/${gameId}`);
+  return data;
+}
+
+export function openGameSocket(gameId) {
+  // Uses the same /api prefix — Vite proxies WS upgrades to ws://127.0.0.1:8000
+  const proto = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+  return new WebSocket(`${proto}//${window.location.host}/api/games/${gameId}/ws`);
 }

@@ -8,7 +8,8 @@ import shutil
 
 load_dotenv()
 
-persistent_path = "./backend/database"
+_THIS_DIR = os.path.dirname(os.path.abspath(__file__))
+persistent_path = os.path.join(_THIS_DIR, "database")
 
 # Book filename → collection name mapping
 BOOK_COLLECTIONS = {
@@ -27,7 +28,7 @@ def chunk(txt):
 def ingest_book(client, book_filename, collection_name):
     """Ingest a single book into its own collection."""
     collection = client.get_or_create_collection(name=collection_name)
-    path = f'./backend/books/{book_filename}'
+    path = os.path.join(_THIS_DIR, "books", book_filename)
     print(f"Ingesting {book_filename} → collection '{collection_name}'")
     loader = TextLoader(path, autodetect_encoding=True)
     documents = loader.load()

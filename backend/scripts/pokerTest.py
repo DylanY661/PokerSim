@@ -1,7 +1,7 @@
 from pypokerengine.api.game import setup_config, start_poker
 from pypokerengine.players import BasePokerPlayer
 import pypokerengine.utils.visualize_utils as U
-from agents import LLMPlayer
+from backend.scripts.agents import LLMPlayer
 import argparse
 # gemini_browser is imported lazily inside run_llm_game so that Playwright is
 # not required when running in API mode.
