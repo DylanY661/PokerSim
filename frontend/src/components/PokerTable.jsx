@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { createGame, startNextRound, stopGame, listGames } from '../api';
 import { useSettings } from '../hooks/useSettings';
 import { useBrowser } from '../hooks/useBrowser';
@@ -19,12 +19,18 @@ export default function PokerTable() {
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [playAsHuman, setPlayAsHuman]     = useState(false);
   const [raiseAmount, setRaiseAmount]     = useState('');
+  const [confirmEnd, setConfirmEnd]       = useState(false);
+  const [stopped, setStopped]             = useState(false);
+  const [revealedSeats, setRevealedSeats] = useState(new Set());
   const gameIdRef = useRef(null);
 
   const auth     = useAuth();
   const settings = useSettings();
   const browser  = useBrowser({ playerCount: settings.playerCount, mode: settings.mode, onError: setError });
   const game     = useGameSocket(setError);
+
+  // Reset per-round seat reveals when a new round starts
+  useEffect(() => { setRevealedSeats(new Set()); }, [game.roundNumber]);
 
   // Clear playAsHuman if user logs out
   const handleLogout = () => { auth.logout(); setPlayAsHuman(false); };
@@ -42,17 +48,31 @@ export default function PokerTable() {
   };
 
   const handleEndGame = async () => {
+    setConfirmEnd(false);
+    setStopped(false);
     await _teardown();
     setPhase('settings');
   };
 
   const handleRestart = async () => {
+    setStopped(false);
     await _teardown();
     browser.resetSession();
   };
 
+  const handleStop = () => {
+    game.sendStop();
+    setStopped(true);
+  };
+
+  const handleResume = () => {
+    setStopped(false);
+    handleNextRound();
+  };
+
   const handleRunGame = async () => {
     setError(null);
+    setStopped(false);
     try {
       const { game_id } = await createGame({
         playerCount:   settings.playerCount,
@@ -152,11 +172,16 @@ export default function PokerTable() {
     return {
       name,
       stack:        game.stacks[name] ?? startingStack,
-      cards:        (showHands || isHuman)
+      cards:        (showHands || isHuman || revealedSeats.has(name))
                       ? (game.holeCards[name] ?? [{ faceDown: true }, { faceDown: true }])
-                      : (name === activePlayers[0]
-                          ? (game.holeCards[name] ?? [{ faceDown: true }, { faceDown: true }])
-                          : [{ faceDown: true }, { faceDown: true }]),
+                      : [{ faceDown: true }, { faceDown: true }],
+      onRevealToggle: (!showHands && !isHuman && game.holeCards[name])
+                      ? () => setRevealedSeats(prev => {
+                          const next = new Set(prev);
+                          next.has(name) ? next.delete(name) : next.add(name);
+                          return next;
+                        })
+                      : null,
       isDealer:     name === game.dealerName,
       isSmallBlind: name === game.sbName,
       isBigBlind:   name === game.bbName,
@@ -176,8 +201,8 @@ export default function PokerTable() {
       {/* Top bar */}
       <div className="flex items-center gap-2 px-4 py-2.5 border-b border-slate-700 bg-slate-800/80 flex-shrink-0">
         <button
-          onClick={() => setPhase('settings')}
-          disabled={game.gameRunning}
+          onClick={handleEndGame}
+          disabled={(game.gameRunning && !stopped) || browser.shuttingDown}
           className="px-3 py-1.5 rounded-lg bg-white hover:bg-gray-100 disabled:opacity-40 text-sm text-black"
         >
           ← Settings
@@ -190,9 +215,14 @@ export default function PokerTable() {
             Round {game.roundNumber}
           </span>
         )}
-        {game.gameRunning && (
+        {game.gameRunning && !stopped && (
           <span className="text-amber-400 text-xs px-2 py-1 rounded bg-amber-950/40 border border-amber-700/40">
             {STREET_LABEL[game.street] ?? game.street}
+          </span>
+        )}
+        {stopped && (
+          <span className="text-blue-300 text-xs px-2 py-1 rounded bg-blue-950/50 border border-blue-700/50">
+            ⏸ Paused
           </span>
         )}
         {error && <span className="text-red-400 text-xs ml-2">⚠ {error}</span>}
@@ -205,29 +235,54 @@ export default function PokerTable() {
             {showHands ? 'Hide Hands' : 'Show Hands'}
           </button>
 
-          <button
-            onClick={handleEndGame}
-            disabled={browser.shuttingDown}
-            className="px-3 py-1.5 rounded-lg bg-white hover:bg-gray-100 disabled:opacity-40 text-sm font-medium text-black"
-          >
-            {browser.shuttingDown ? 'Ending…' : 'End Game'}
-          </button>
-
-          {game.gameRunning ? (
+          {confirmEnd ? (
             <button
-              onClick={game.sendStop}
+              onClick={handleEndGame}
+              disabled={browser.shuttingDown}
+              className="px-3 py-1.5 rounded-lg bg-red-600 hover:bg-red-500 disabled:opacity-40 text-sm font-medium text-white"
+            >
+              Confirm End?
+            </button>
+          ) : (
+            <button
+              onClick={() => setConfirmEnd(true)}
+              disabled={browser.shuttingDown}
+              className="px-3 py-1.5 rounded-lg bg-white hover:bg-gray-100 disabled:opacity-40 text-sm font-medium text-black"
+            >
+              {browser.shuttingDown ? 'Ending…' : 'End Game'}
+            </button>
+          )}
+
+          {game.gameRunning && !stopped ? (
+            <button
+              onClick={handleStop}
               className="px-4 py-1.5 rounded-lg bg-white hover:bg-gray-100 font-semibold text-sm text-black"
             >
-              ⏹ Stop
+              ⏸ Pause
+            </button>
+          ) : stopped ? (
+            <button
+              onClick={handleResume}
+              className="px-4 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-400 font-semibold text-sm text-black"
+            >
+              ▶ Resume
             </button>
           ) : game.roundComplete ? (
-            <button
-              onClick={handleNextRound}
-              disabled={!!game.tournamentWinner}
-              className={`px-4 py-1.5 rounded-lg font-semibold text-sm text-black ${game.tournamentWinner ? 'bg-gray-200 opacity-50 cursor-not-allowed' : 'bg-white hover:bg-gray-100'}`}
-            >
-              {game.tournamentWinner ? 'Tournament Over' : 'Next Round'}
-            </button>
+            game.tournamentWinner ? (
+              <button
+                onClick={handleEndGame}
+                className="px-4 py-1.5 rounded-lg bg-green-600 hover:bg-green-500 font-semibold text-sm text-white"
+              >
+                New Game
+              </button>
+            ) : (
+              <button
+                onClick={handleNextRound}
+                className="px-4 py-1.5 rounded-lg bg-white hover:bg-gray-100 font-semibold text-sm text-black"
+              >
+                Next Round
+              </button>
+            )
           ) : (
             <button
               onClick={handleRunGame}

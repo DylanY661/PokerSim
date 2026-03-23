@@ -1,7 +1,7 @@
 import Card from './Card';
 import { ACTION_TEXT, ACTION_BADGE } from '../constants';
 
-export default function Seat({ name, stack, cards, isDealer, isSmallBlind, isBigBlind, isActive, isThinking, lastAction, isFolded, isAllIn, style }) {
+export default function Seat({ name, stack, cards, isDealer, isSmallBlind, isBigBlind, isActive, isThinking, lastAction, isFolded, isAllIn, onRevealToggle, style }) {
   return (
     <div
       className={`absolute flex flex-col items-center rounded-xl px-2 py-1.5 min-w-[88px] transition-all border
@@ -13,7 +13,7 @@ export default function Seat({ name, stack, cards, isDealer, isSmallBlind, isBig
       style={style}
     >
       <span className={`font-semibold text-xs leading-tight ${isFolded ? 'text-slate-500' : 'text-white'}`}>{name}</span>
-      <span className="text-amber-300 text-xs leading-tight">${stack}</span>
+      <span className="text-amber-300 text-xs leading-tight">${stack.toLocaleString()}</span>
 
       {isThinking && (
         <span className="text-slate-400 text-[10px] animate-pulse mt-0.5">thinking…</span>
@@ -30,11 +30,16 @@ export default function Seat({ name, stack, cards, isDealer, isSmallBlind, isBig
         <span className={`text-[10px] font-bold uppercase px-1.5 py-0.5 rounded border mt-0.5
           ${ACTION_BADGE[lastAction.action] || 'bg-slate-700 border-slate-600'}
           ${ACTION_TEXT[lastAction.action]  || 'text-white'}`}>
-          {lastAction.action}{lastAction.amount > 0 ? ` $${lastAction.amount}` : ''}
+          {lastAction.action === 'call' && lastAction.amount === 0
+            ? 'Check'
+            : `${lastAction.action}${lastAction.amount > 0 ? ` $${lastAction.amount.toLocaleString()}` : ''}`}
         </span>
       )}
 
-      <div className="flex gap-0.5 mt-1">
+      <div
+        className={`flex gap-0.5 mt-1 rounded ${onRevealToggle ? 'cursor-pointer hover:ring-1 hover:ring-slate-400/50' : ''}`}
+        onClick={onRevealToggle ?? undefined}
+      >
         {cards?.map((c, i) => <Card key={i} {...c} />)}
       </div>
 

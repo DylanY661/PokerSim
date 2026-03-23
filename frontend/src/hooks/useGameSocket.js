@@ -26,7 +26,8 @@ export function useGameSocket(onError) {
   const wsRef = useRef(null);
 
   const handleWsEvent = useCallback((event) => {
-    const data = JSON.parse(event.data);
+    let data;
+    try { data = JSON.parse(event.data); } catch { return; }
     switch (data.type) {
       case 'deal':
         if (data.players?.length) setPlayers(data.players);

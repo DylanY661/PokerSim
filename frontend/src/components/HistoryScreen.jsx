@@ -30,7 +30,7 @@ export default function HistoryScreen({ games, loading, onBack, isAuthenticated,
             {games.map(g => (
               <div key={g.id} className="bg-slate-800 border border-slate-700 rounded-xl px-5 py-3 flex items-center gap-6">
                 <div className="text-slate-400 text-xs w-36 flex-shrink-0">
-                  {new Date(g.created_at).toLocaleString()}
+                  {new Date(g.created_at).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}
                 </div>
                 <div className="text-xs text-slate-300 w-20 flex-shrink-0">
                   {g.player_count} players

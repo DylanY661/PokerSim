@@ -43,7 +43,7 @@ export default function AuthModal({ onClose, onLogin, onRegister }) {
           {['login', 'register'].map(t => (
             <button
               key={t}
-              onClick={() => { setTab(t); setError(null); }}
+              onClick={() => { setTab(t); setError(null); setPassword(''); }}
               className={`flex-1 py-1.5 rounded-md text-sm font-medium transition-colors
                 ${tab === t ? 'bg-white text-black' : 'text-black hover:bg-gray-100'}`}
             >

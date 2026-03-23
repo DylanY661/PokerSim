@@ -5,7 +5,9 @@
       "Bash(python:*)",
       "Bash(npm test:*)",
       "Bash(pushd C:/Code/poker/backend)",
-      "Bash(popd)"
+      "Bash(popd)",
+      "Bash(wc:*)",
+      "Bash(git:*)"
     ]
   }
 }

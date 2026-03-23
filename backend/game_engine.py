@@ -218,12 +218,13 @@ async def _run_street(
     actions_log:    list,
     action_queue=None,
 ) -> dict:
-    s           = dict(stacks)
-    p           = pot
-    folded:     set[str] = set()
-    all_in:     set[str] = set()
-    contributed = {pl: 0 for pl in players}
-    to_call     = initial_to_call
+    s               = dict(stacks)
+    p               = pot
+    folded:         set[str] = set()
+    all_in:         set[str] = set()
+    contributed     = {pl: 0 for pl in players}
+    to_call         = initial_to_call
+    last_raise_size = config.bb
 
     for player in players:
         if stop_check():
@@ -250,7 +251,7 @@ async def _run_street(
                 "to_call":      need_to_call,
                 "pot":          p,
                 "stack":        s[player],
-                "min_raise":    need_to_call + config.bb,
+                "min_raise":    need_to_call + last_raise_size,
                 "valid_actions": ["fold", "call", "raise"],
             })
             try:
@@ -285,7 +286,8 @@ async def _run_street(
             p              += total
             contributed[player] += total
             to_call         = contributed[player]
-            emitted_amount  = amount
+            last_raise_size = max(raise_part, config.bb)
+            emitted_amount  = total
         else:  # call
             call_amt = min(need_to_call, s[player])
             s[player]      -= call_amt
@@ -456,24 +458,31 @@ async def run_round(
     s, pot = res["stacks"], res["pot"]
 
     # SHOWDOWN
-    survivors   = res["still_active"]
-    winner      = None
-    winner_hand = None
+    survivors    = res["still_active"]
+    best_hand    = None
+    tied_winners = []
     for player in survivors:
         seven = hole_cards[player] + river
         hand  = best_hand_of_7(seven)
-        if winner_hand is None or _compare_hands(hand, winner_hand) > 0:
-            winner      = player
-            winner_hand = hand
+        if best_hand is None:
+            best_hand, tied_winners = hand, [player]
+        elif _compare_hands(hand, best_hand) > 0:
+            best_hand, tied_winners = hand, [player]
+        elif _compare_hands(hand, best_hand) == 0:
+            tied_winners.append(player)
 
-    await _finish([winner] if winner else [], pot, s, hole_cards, community_deck, all_in,
+    await _finish(tied_winners, pot, s, hole_cards, community_deck, all_in,
                   initial_stacks, players, game_id, round_number, dealer_name,
-                  sb_player, bb_player, actions_log, emit, winner_hand)
+                  sb_player, bb_player, actions_log, emit, best_hand)
 
     # Update the shared game_stacks dict so main.py sees the new balances
     game_stacks.update(s)
-    if winner:
-        game_stacks[winner] = game_stacks.get(winner, 0) + pot
+    if tied_winners:
+        share     = pot // len(tied_winners)
+        remainder = pot % len(tied_winners)
+        for w in tied_winners:
+            game_stacks[w] = game_stacks.get(w, 0) + share
+        game_stacks[tied_winners[0]] = game_stacks.get(tied_winners[0], 0) + remainder
 
 
 async def _finish(
@@ -484,23 +493,28 @@ async def _finish(
     winner    = still_active[0] if still_active else None
     hand_name = winner_hand['name'] if winner_hand else None
 
-    # Build new stacks with pot awarded
+    # Build new stacks with pot awarded (split on tie)
     new_stacks = dict(final_stacks)
-    if winner:
-        new_stacks[winner] = new_stacks.get(winner, 0) + pot
+    if still_active:
+        share     = pot // len(still_active)
+        remainder = pot % len(still_active)
+        for w in still_active:
+            new_stacks[w] = new_stacks.get(w, 0) + share
+        new_stacks[still_active[0]] = new_stacks.get(still_active[0], 0) + remainder
 
     # Bust-outs: had chips entering round, now at 0
     busted = [p for p in players
-              if p != winner and final_stacks.get(p, 0) == 0 and initial_stacks.get(p, 0) > 0]
+              if p not in still_active and final_stacks.get(p, 0) == 0 and initial_stacks.get(p, 0) > 0]
 
     await emit({
-        "type":       "round_end",
-        "winner":     winner,
-        "hand":       hand_name,
-        "pot":        pot,
-        "stacks":     new_stacks,
-        "busted":     busted,
-        "hole_cards": hole_cards,   # reveal all hands at showdown
+        "type":        "round_end",
+        "winner":      winner,
+        "tied_winners": still_active if len(still_active) > 1 else None,
+        "hand":        hand_name,
+        "pot":         pot,
+        "stacks":      new_stacks,
+        "busted":      busted,
+        "hole_cards":  hole_cards,   # reveal all hands at showdown
     })
 
     # Check for tournament end

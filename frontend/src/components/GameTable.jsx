@@ -13,7 +13,7 @@ export default function GameTable({ seats, communityCards, pot, lastWinner, game
             : 'bg-amber-950/60 border-amber-600/50'
         }`}>
           <p className={`font-bold text-lg ${tournamentWinner ? 'text-green-300' : 'text-amber-300'}`}>
-            🏆 {lastWinner.name} wins${lastWinner.amount > 0 ? ` $${lastWinner.amount}` : ''}!
+            🏆 {lastWinner.name} wins${lastWinner.amount > 0 ? ` $${lastWinner.amount.toLocaleString()}` : ''}!
           </p>
           {lastWinner.handName && (
             <p className="text-amber-400 text-sm mt-0.5">{lastWinner.handName}</p>
@@ -50,7 +50,7 @@ export default function GameTable({ seats, communityCards, pot, lastWinner, game
               : [0, 1, 2, 3, 4].map(i => <Card key={i} faceDown />)}
           </div>
           <div className="px-3 py-1 rounded-full bg-black/60 border border-amber-600/60 text-amber-300 font-bold text-xs">
-            Pot: ${pot}
+            Pot: ${pot.toLocaleString()}
           </div>
         </div>
 
