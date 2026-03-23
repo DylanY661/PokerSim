@@ -43,16 +43,37 @@ export async function confirmLogin() {
   return data;
 }
 
+// ── Auth API ──────────────────────────────────────────────────────────────────
+
+export async function registerUser(username, password) {
+  const { data } = await axios.post(`${API_BASE}/auth/register`, { username, password });
+  return data;  // { token, username }
+}
+
+export async function loginUser(username, password) {
+  const { data } = await axios.post(`${API_BASE}/auth/login`, { username, password });
+  return data;  // { token, username }
+}
+
+export async function getMe(token) {
+  const { data } = await axios.get(`${API_BASE}/auth/me`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  return data;  // { id, username }
+}
+
 // ── Game API ──────────────────────────────────────────────────────────────────
 
-export async function createGame({ playerCount, startingStack, aiMode, ollamaModel, actionSpeed }) {
+export async function createGame({ playerCount, startingStack, aiMode, ollamaModel, actionSpeed, humanPlayer, token }) {
+  const headers = token ? { Authorization: `Bearer ${token}` } : {};
   const { data } = await axios.post(`${API_BASE}/games`, {
     player_count:   playerCount,
     starting_stack: startingStack,
     ai_mode:        aiMode,
     ollama_model:   ollamaModel || null,
     action_speed:   actionSpeed / 1000,   // ms → seconds
-  });
+    human_player:   humanPlayer || null,
+  }, { headers });
   return data;   // { game_id }
 }
 
@@ -66,8 +87,9 @@ export async function stopGame(gameId) {
   return data;
 }
 
-export async function listGames() {
-  const { data } = await axios.get(`${API_BASE}/games`);
+export async function listGames(token) {
+  const headers = token ? { Authorization: `Bearer ${token}` } : {};
+  const { data } = await axios.get(`${API_BASE}/games`, { headers });
   return data;
 }
 

@@ -9,6 +9,13 @@ DATABASE_URL = f"sqlite:///{os.path.join(_THIS_DIR, 'poker.db')}"
 engine       = create_engine(DATABASE_URL, echo=False)
 
 
+class User(SQLModel, table=True):
+    id:            Optional[int] = Field(default=None, primary_key=True)
+    username:      str           = Field(unique=True, index=True)
+    password_hash: str
+    created_at:    datetime      = Field(default_factory=datetime.utcnow)
+
+
 class Game(SQLModel, table=True):
     id:                Optional[int]      = Field(default=None, primary_key=True)
     created_at:        datetime           = Field(default_factory=datetime.utcnow)

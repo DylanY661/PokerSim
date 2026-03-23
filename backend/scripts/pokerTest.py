@@ -2,9 +2,8 @@ from pypokerengine.api.game import setup_config, start_poker
 from pypokerengine.players import BasePokerPlayer
 import pypokerengine.utils.visualize_utils as U
 from backend.scripts.agents import LLMPlayer
+from gemini_browser import initialize_browser, shutdown_browser
 import argparse
-# gemini_browser is imported lazily inside run_llm_game so that Playwright is
-# not required when running in API mode.
 
 # A bot that just calls everything (The "Fish")
 class FishPlayer(BasePokerPlayer):
@@ -50,7 +49,6 @@ def run_llm_game(num_players=5, use_browser=False):
     config = setup_config(max_round=5, initial_stack=1000, small_blind_amount=10)
 
     if use_browser:
-        from gemini_browser import initialize_browser, shutdown_browser
         # Open one browser context per player before the game begins.
         # LLMPlayer.__init__ sends each personality prompt, so the browser must
         # be ready before config.register_player() is called.

@@ -9,9 +9,13 @@ to the caller via an `emit` async callable.
 import asyncio
 import json
 import random
+import re
 from dataclasses import dataclass, field
 from itertools import combinations
 from typing import Callable, Awaitable, Optional
+from gemini_browser import query_gemini_browser
+from llm.ollama_client import generate as ollama_generate, OllamaError
+from db import save_round as db_save_round
 
 
 # ── Constants ─────────────────────────────────────────────────────────────────
@@ -35,6 +39,7 @@ class GameConfig:
     collections:      dict                   # player_name → chromadb collection
     gemini_client:    object                 = None
     browser_ready:    list                   = field(default_factory=lambda: [False])
+    human_player:     Optional[str]          = None  # username of human seat, or None
 
     @property
     def sb(self) -> int:
@@ -146,7 +151,6 @@ def _build_prompt(player: str, state: dict, config: GameConfig) -> str:
 
 
 def _parse_response(text: str) -> dict:
-    import re
     match = re.search(r'\{[^{}]*\}', text, re.DOTALL)
     if not match:
         return {"action": "call", "amount": 0, "reasoning": "Could not parse response."}
@@ -170,12 +174,10 @@ async def get_ai_action(player: str, state: dict, config: GameConfig) -> dict:
     prompt = _build_prompt(player, state, config)
 
     if config.mode == "browser":
-        from gemini_browser import query_gemini_browser
         text = await asyncio.to_thread(query_gemini_browser, prompt, player)
         return _parse_response(text)
 
     if config.mode == "ollama":
-        from llm.ollama_client import generate as ollama_generate, OllamaError
         def _call():
             return ollama_generate(
                 prompt=prompt,
@@ -214,6 +216,7 @@ async def _run_street(
     stop_check:     Callable[[], bool],
     emit:           Callable[[dict], Awaitable[None]],
     actions_log:    list,
+    action_queue=None,
 ) -> dict:
     s           = dict(stacks)
     p           = pot
@@ -239,11 +242,32 @@ async def _run_street(
             "stack":           s[player],
             "street":          street_name,
         }
-        try:
-            result = await get_ai_action(player, state, config)
-        except Exception as e:
-            result = {"action": "call", "amount": need_to_call, "reasoning": f"Error: {e}"}
-            await emit({"type": "error", "message": str(e)})
+        if config.human_player and player == config.human_player:
+            # Wait for a human action from the WebSocket
+            await emit({
+                "type":         "action_required",
+                "player":       player,
+                "to_call":      need_to_call,
+                "pot":          p,
+                "stack":        s[player],
+                "min_raise":    need_to_call + config.bb,
+                "valid_actions": ["fold", "call", "raise"],
+            })
+            try:
+                raw = await asyncio.wait_for(action_queue.get(), timeout=300)
+                result = {
+                    "action":    raw.get("action", "fold"),
+                    "amount":    int(raw.get("amount", 0) or 0),
+                    "reasoning": "Human action",
+                }
+            except asyncio.TimeoutError:
+                result = {"action": "fold", "amount": 0, "reasoning": "Timed out — auto-folded"}
+        else:
+            try:
+                result = await get_ai_action(player, state, config)
+            except Exception as e:
+                result = {"action": "call", "amount": need_to_call, "reasoning": f"Error: {e}"}
+                await emit({"type": "error", "message": str(e)})
 
         action    = result["action"]
         amount    = result.get("amount", 0)
@@ -289,6 +313,10 @@ async def _run_street(
             actions_log.append({"player": player, "street": street_name, "action": action,
                                  "amount": emitted_amount, "reasoning": reasoning})
 
+        # End street immediately once only one player remains
+        if len([pl for pl in players if pl not in folded]) <= 1:
+            break
+
         if config.action_speed > 0:
             await asyncio.sleep(config.action_speed)
 
@@ -306,15 +334,13 @@ async def run_round(
     config:         GameConfig,
     stop_check:     Callable[[], bool],
     emit:           Callable[[dict], Awaitable[None]],
+    action_queue=None,
 ):
     """
     Drive a complete poker round.  Updates game_stacks in-place and emits
     round_end (and optionally game_end) when done.  Saves to DB.
     """
-    from db import save_round as db_save_round
-
-    players = [p for p in PLAYER_NAMES[:config.player_count]
-               if game_stacks.get(p, 0) > 0]
+    players = [p for p in game_stacks if game_stacks[p] > 0]
 
     # Tournament already decided
     if len(players) <= 1:
@@ -339,6 +365,7 @@ async def run_round(
 
     await emit({
         "type":         "deal",
+        "players":      players,
         "hole_cards":   hole_cards,
         "dealer":       dealer_name,
         "sb":           sb_player,
@@ -374,6 +401,7 @@ async def run_round(
         return await _run_street(
             active, cur_stacks, cur_pot, community, street_name,
             init_call, hole_cards, config, stop_check, emit, actions_log,
+            action_queue=action_queue,
         )
 
     # PREFLOP
@@ -453,8 +481,6 @@ async def _finish(
     initial_stacks, players, game_id, round_number, dealer, sb, bb,
     actions_log, emit, winner_hand=None,
 ):
-    from db import save_round as db_save_round
-
     winner    = still_active[0] if still_active else None
     hand_name = winner_hand['name'] if winner_hand else None
 

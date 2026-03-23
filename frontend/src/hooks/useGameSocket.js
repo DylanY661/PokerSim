@@ -20,6 +20,8 @@ export function useGameSocket(onError) {
   const [roundComplete, setRoundComplete]   = useState(false);
   const [lastWinner, setLastWinner]         = useState(null);
   const [tournamentWinner, setTournamentWinner] = useState(null);
+  const [humanActionRequired, setHumanActionRequired] = useState(null);
+  const [players, setPlayers]                         = useState([]);
 
   const wsRef = useRef(null);
 
@@ -27,6 +29,7 @@ export function useGameSocket(onError) {
     const data = JSON.parse(event.data);
     switch (data.type) {
       case 'deal':
+        if (data.players?.length) setPlayers(data.players);
         setHoleCards(data.hole_cards ?? {});
         setDealerName(data.dealer);
         setSbName(data.sb);
@@ -49,7 +52,17 @@ export function useGameSocket(onError) {
       case 'thinking':
         setActivePlayer(data.player);
         break;
+      case 'action_required':
+        setHumanActionRequired({
+          toCall:       data.to_call,
+          pot:          data.pot,
+          stack:        data.stack,
+          minRaise:     data.min_raise,
+          validActions: data.valid_actions,
+        });
+        break;
       case 'action':
+        setHumanActionRequired(null);
         setActivePlayer(null);
         setStacks(data.stacks ?? {});
         setPot(data.pot ?? 0);
@@ -105,6 +118,11 @@ export function useGameSocket(onError) {
       wsRef.current.send(JSON.stringify({ type: 'stop' }));
   };
 
+  const sendHumanAction = (action, amount = 0) => {
+    if (wsRef.current?.readyState === WebSocket.OPEN)
+      wsRef.current.send(JSON.stringify({ type: 'human_action', action, amount }));
+  };
+
   const resetGameState = () => {
     setHoleCards({});
     setDealerName(null);
@@ -124,9 +142,12 @@ export function useGameSocket(onError) {
     setRoundComplete(false);
     setLastWinner(null);
     setTournamentWinner(null);
+    setHumanActionRequired(null);
+    setPlayers([]);
   };
 
   return {
+    players,
     holeCards, dealerName, sbName, bbName, roundNumber,
     communityCards, street,
     activePlayer, playerActions,
@@ -135,7 +156,8 @@ export function useGameSocket(onError) {
     gameLog,
     gameRunning, roundComplete,
     lastWinner, tournamentWinner,
+    humanActionRequired,
     wsRef,
-    connect, disconnect, sendStop, resetGameState,
+    connect, disconnect, sendStop, sendHumanAction, resetGameState,
   };
 }

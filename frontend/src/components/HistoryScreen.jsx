@@ -1,17 +1,27 @@
-export default function HistoryScreen({ games, loading, onBack }) {
+export default function HistoryScreen({ games, loading, onBack, isAuthenticated, onShowAuth }) {
   return (
     <div className="min-h-screen bg-slate-900 text-white flex flex-col p-6">
       <div className="w-full max-w-4xl mx-auto">
         <div className="flex items-center gap-4 mb-6">
           <button
             onClick={onBack}
-            className="px-3 py-1.5 rounded-lg bg-slate-700 hover:bg-slate-600 text-sm"
+            className="px-3 py-1.5 rounded-lg bg-white hover:bg-gray-100 text-sm text-black"
           >
             ← Back
           </button>
           <h1 className="text-xl font-bold">Game History</h1>
         </div>
-        {loading ? (
+        {!isAuthenticated ? (
+          <div className="text-center py-12">
+            <p className="text-slate-400 text-sm mb-3">Sign in to view your game history</p>
+            <button
+              onClick={onShowAuth}
+              className="px-4 py-2 rounded-lg bg-white hover:bg-gray-100 text-sm font-medium text-black transition-colors"
+            >
+              Sign In / Register
+            </button>
+          </div>
+        ) : loading ? (
           <p className="text-slate-400 text-sm animate-pulse">Loading…</p>
         ) : games.length === 0 ? (
           <p className="text-slate-500 text-sm">No games played yet.</p>
@@ -44,3 +54,4 @@ export default function HistoryScreen({ games, loading, onBack }) {
     </div>
   );
 }
+

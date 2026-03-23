@@ -1,9 +1,10 @@
 // Simple toggle using inline styles to avoid Tailwind purge issues
-export default function Toggle({ value, onChange }) {
+export default function Toggle({ value, onChange, disabled }) {
   return (
     <button
       type="button"
-      onClick={() => onChange(!value)}
+      disabled={disabled}
+      onClick={() => onChange?.(!value)}
       style={{
         position: 'relative',
         display: 'inline-flex',

@@ -5,8 +5,9 @@ import time
 import chromadb
 from pypokerengine.players import BasePokerPlayer
 from dotenv import load_dotenv
-# gemini_browser and google.genai are imported lazily inside the class so that
-# only the package needed for the chosen mode must be installed.
+from gemini_browser import init_player_chat, query_gemini_browser
+from google import genai
+from google.genai import errors as genai_errors
 
 load_dotenv()
 
@@ -42,11 +43,9 @@ class LLMPlayer(BasePokerPlayer):
         if use_browser:
             # Send personality prompt to this player's Gemini browser chat session.
             # initialize_browser() must have been called before LLMPlayer is created.
-            from gemini_browser import init_player_chat
             init_player_chat(self.personality, self.system_prompt)
         else:
             # Set up the direct Gemini API client.
-            from google import genai
             self.gemini_client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
             self.model = "gemini-2.5-flash"
 
@@ -67,14 +66,12 @@ class LLMPlayer(BasePokerPlayer):
 
         # Query Gemini — browser automation or direct API depending on mode
         if self.use_browser:
-            from gemini_browser import query_gemini_browser
             try:
                 response_text = query_gemini_browser(user_message, self.personality)
             except Exception as e:
                 print(f"[{self.personality}] Browser query failed: {e}")
                 return valid_actions[1]["action"], valid_actions[1]["amount"]
         else:
-            from google.genai import errors as genai_errors
             response = None
             for attempt in range(5):
                 try:

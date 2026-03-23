@@ -1,14 +1,13 @@
 import Toggle from './Toggle';
 import SegmentGroup from './SegmentGroup';
-import { PLAYER_NAMES, OLLAMA_MODELS, calcBlinds } from '../constants';
+import { OLLAMA_MODELS, calcBlinds } from '../constants';
 
-export default function SettingsScreen({ settings, browser, error, onStart, onHistory, onRestart }) {
+export default function SettingsScreen({ settings, browser, error, onStart, onHistory, onRestart, auth, playAsHuman, onTogglePlayAsHuman, onShowAuth }) {
   const {
     mode, setMode,
     ollamaModel, setOllamaModel,
     playerCount, setPlayerCount,
     startingStack, setStartingStack,
-    actionSpeed, setActionSpeed,
     showHands, setShowHands,
   } = settings;
 
@@ -30,7 +29,7 @@ export default function SettingsScreen({ settings, browser, error, onStart, onHi
         {/* Header */}
         <div className="bg-gradient-to-br from-green-900 to-green-950 px-10 py-5 flex items-center justify-between border-b border-slate-700">
           <div>
-            <h1 className="text-2xl font-bold text-white">Poker Simulator</h1>
+            <h1 className="text-2xl font-bold text-white">Poker Showdown</h1>
             <p className="text-green-400 text-sm mt-0.5">AI-Powered Texas Hold'em</p>
           </div>
           <div className="flex flex-col items-end gap-1.5">
@@ -38,8 +37,26 @@ export default function SettingsScreen({ settings, browser, error, onStart, onHi
             {connected ? (
               <span className="text-xs text-emerald-400 font-medium">● Engine connected</span>
             ) : (
-              <button onClick={reconnect} className="text-xs text-amber-400 hover:text-amber-300 underline">
+              <button onClick={reconnect} className="text-xs text-black hover:text-gray-700 underline">
                 ○ Engine offline — retry
+              </button>
+            )}
+            {auth?.user ? (
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-slate-300">👤 {auth.user.username}</span>
+                <button
+                  onClick={auth.logout}
+                  className="text-xs text-black hover:text-gray-700 underline"
+                >
+                  Sign out
+                </button>
+              </div>
+            ) : (
+              <button
+                onClick={onShowAuth}
+                className="text-xs text-black hover:text-gray-700 underline"
+              >
+                Sign in / Register
               </button>
             )}
           </div>
@@ -48,7 +65,7 @@ export default function SettingsScreen({ settings, browser, error, onStart, onHi
         {/* Two-column body */}
         <div className="grid grid-cols-2 gap-0 divide-x divide-slate-700">
 
-          {/* Left column */}
+          {/* Left column — AI settings */}
           <div className="px-8 py-6 space-y-5">
 
             {/* AI Mode */}
@@ -93,31 +110,6 @@ export default function SettingsScreen({ settings, browser, error, onStart, onHi
               </div>
             )}
 
-            {/* Player Count */}
-            <div>
-              <p className="text-slate-400 text-xs uppercase tracking-wider mb-2">Number of Players</p>
-              <SegmentGroup options={[3, 4, 5]} value={playerCount} onChange={setPlayerCount} />
-              <p className="text-slate-500 text-xs mt-1.5">{PLAYER_NAMES.slice(0, playerCount).join(', ')}</p>
-            </div>
-
-            {/* Starting Stack */}
-            <div>
-              <p className="text-slate-400 text-xs uppercase tracking-wider mb-2">Starting Stack</p>
-              <SegmentGroup
-                options={[500, 1000, 2000]}
-                value={startingStack}
-                onChange={setStartingStack}
-                labelFn={n => `$${n}`}
-              />
-              <p className="text-slate-500 text-xs mt-1.5">
-                Blinds: ${sb} / ${bb} &nbsp;·&nbsp; {Math.floor(startingStack / bb)} big blinds each
-              </p>
-            </div>
-
-          </div>
-
-          <div className="px-8 py-6 space-y-5">
-
             {/* Browser Setup */}
             {mode === 'browser' && (
               <div>
@@ -126,10 +118,10 @@ export default function SettingsScreen({ settings, browser, error, onStart, onHi
                   <button
                     onClick={init}
                     disabled={browserSufficient || initingBrowser || !connected}
-                    className={`flex-1 py-2.5 rounded-lg font-medium text-sm transition-colors disabled:opacity-50
+                    className={`flex-1 py-2.5 rounded-lg font-medium text-sm text-black transition-colors disabled:opacity-50
                       ${browserSufficient
-                        ? 'bg-violet-900 text-violet-200 cursor-default'
-                        : 'bg-violet-600 hover:bg-violet-500 text-black'}`}
+                        ? 'bg-gray-200 cursor-default'
+                        : 'bg-white hover:bg-gray-100'}`}
                   >
                     {initingBrowser
                       ? '⏳ Initializing…'
@@ -143,7 +135,7 @@ export default function SettingsScreen({ settings, browser, error, onStart, onHi
                     <button
                       onClick={stop}
                       disabled={shuttingDown}
-                      className="px-3 py-2.5 rounded-lg bg-red-900 hover:bg-red-800 disabled:opacity-40 text-sm font-medium text-red-200 transition-colors"
+                      className="px-3 py-2.5 rounded-lg bg-white hover:bg-gray-100 disabled:opacity-40 text-sm font-medium text-black transition-colors"
                     >
                       {shuttingDown ? '…' : '⏹ Stop'}
                     </button>
@@ -172,9 +164,9 @@ export default function SettingsScreen({ settings, browser, error, onStart, onHi
                     <button
                       onClick={confirmLogin}
                       disabled={confirmingLogin}
-                      className="w-full py-2 rounded-lg bg-emerald-700 hover:bg-emerald-600 disabled:opacity-50 text-white text-sm font-medium transition-colors"
+                      className="w-full py-2 rounded-lg bg-white hover:bg-gray-100 disabled:opacity-50 text-black text-sm font-medium transition-colors"
                     >
-                      {confirmingLogin ? '⏳ Saving session…' : '✓ I\'m Done Signing In'}
+                      {confirmingLogin ? 'Saving session…' : '✓ I\'m Done Signing In'}
                     </button>
                   </div>
                 ) : (
@@ -193,14 +185,14 @@ export default function SettingsScreen({ settings, browser, error, onStart, onHi
                         {sessionStatus !== true && (
                           <button
                             onClick={startLogin}
-                            className="text-black hover:text-black text-xs px-2 py-1 rounded border border-violet-800 hover:border-violet-600 transition-colors"
+                            className="text-black text-xs px-2 py-1 rounded bg-white hover:bg-gray-100 border border-gray-300 transition-colors"
                           >
                             Sign In
                           </button>
                         )}
                         <button
                           onClick={checkSession}
-                          className="text-black hover:text-black text-xs px-2 py-1 rounded border border-slate-700 hover:border-slate-500 transition-colors"
+                          className="text-black text-xs px-2 py-1 rounded bg-white hover:bg-gray-100 border border-gray-300 transition-colors"
                         >
                           ↺
                         </button>
@@ -208,7 +200,7 @@ export default function SettingsScreen({ settings, browser, error, onStart, onHi
                           <button
                             onClick={clearSession}
                             disabled={clearingSession}
-                            className="text-red-500 hover:text-red-400 text-xs px-2 py-1 rounded border border-red-900 hover:border-red-700 transition-colors disabled:opacity-40"
+                            className="text-black text-xs px-2 py-1 rounded bg-white hover:bg-gray-100 border border-gray-300 transition-colors disabled:opacity-40"
                           >
                             {clearingSession ? '…' : 'Clear'}
                           </button>
@@ -223,16 +215,29 @@ export default function SettingsScreen({ settings, browser, error, onStart, onHi
               </div>
             )}
 
-            {/* Action Speed */}
+          </div>
+
+          {/* Right column — Game settings */}
+          <div className="px-8 py-6 space-y-5">
+
+            {/* Player Count */}
             <div>
-              <p className="text-slate-400 text-xs uppercase tracking-wider mb-2">Action Speed</p>
+              <p className="text-slate-400 text-xs uppercase tracking-wider mb-2">Number of Players</p>
+              <SegmentGroup options={[3, 4, 5]} value={playerCount} onChange={setPlayerCount} />
+            </div>
+
+            {/* Starting Stack */}
+            <div>
+              <p className="text-slate-400 text-xs uppercase tracking-wider mb-2">Starting Stack</p>
               <SegmentGroup
-                options={[0, 1000, 2500]}
-                value={actionSpeed}
-                onChange={setActionSpeed}
-                labelFn={v => v === 0 ? '⚡ Fast' : v === 1000 ? '▶ Normal' : '🐢 Slow'}
+                options={[500, 1000, 2000]}
+                value={startingStack}
+                onChange={setStartingStack}
+                labelFn={n => `$${n}`}
               />
-              <p className="text-slate-500 text-xs mt-1.5">Delay between each AI action</p>
+              <p className="text-slate-500 text-xs mt-1.5">
+                Blinds: ${sb} / ${bb} &nbsp;·&nbsp; {Math.floor(startingStack / bb)} big blinds each
+              </p>
             </div>
 
             {/* Show Hands */}
@@ -242,6 +247,19 @@ export default function SettingsScreen({ settings, browser, error, onStart, onHi
                 <p className="text-slate-500 text-xs">Reveal face-down cards during the game</p>
               </div>
               <Toggle value={showHands} onChange={setShowHands} />
+            </div>
+
+            {/* Play as Human */}
+            <div className={`flex items-center justify-between py-1 ${!auth?.user ? 'opacity-40' : ''}`}>
+              <div>
+                <p className="text-slate-300 text-sm font-medium">
+                  {auth?.user ? `Play as ${auth.user.username}` : 'Play as Human'}
+                </p>
+                <p className="text-slate-500 text-xs">
+                  {auth?.user ? 'Join the game as a human player' : 'Sign in to play as a human'}
+                </p>
+              </div>
+              <Toggle value={playAsHuman} onChange={onTogglePlayAsHuman} disabled={!auth?.user} />
             </div>
 
             {error && (
@@ -258,13 +276,13 @@ export default function SettingsScreen({ settings, browser, error, onStart, onHi
           <button
             onClick={onStart}
             disabled={!canStart}
-            className="flex-1 py-3.5 rounded-xl bg-amber-600 hover:bg-amber-500 disabled:opacity-30 disabled:cursor-not-allowed font-bold text-lg transition-colors"
+            className="flex-1 py-3.5 rounded-xl bg-white hover:bg-gray-100 disabled:opacity-30 disabled:cursor-not-allowed font-bold text-lg text-black transition-colors"
           >
             ▶ Start Game
           </button>
           <button
             onClick={onHistory}
-            className="px-4 py-3.5 rounded-xl bg-slate-700 hover:bg-slate-600 text-black text-sm font-medium transition-colors whitespace-nowrap"
+            className="px-4 py-3.5 rounded-xl bg-white hover:bg-gray-100 text-black text-sm font-medium transition-colors whitespace-nowrap"
           >
             History
           </button>
@@ -272,7 +290,7 @@ export default function SettingsScreen({ settings, browser, error, onStart, onHi
             <button
               onClick={onRestart}
               disabled={shuttingDown}
-              className="px-5 py-3.5 rounded-xl bg-slate-700 hover:bg-slate-600 disabled:opacity-40 text-black text-sm font-medium transition-colors whitespace-nowrap"
+              className="px-5 py-3.5 rounded-xl bg-white hover:bg-gray-100 disabled:opacity-40 text-black text-sm font-medium transition-colors whitespace-nowrap"
             >
               {shuttingDown ? 'Restarting…' : 'Restart'}
             </button>

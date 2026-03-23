@@ -1,21 +1,30 @@
 import os
 import asyncio
+import random
 import chromadb
 from datetime import datetime
 from dotenv import load_dotenv
-from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect, Header
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import Optional, Literal
 from google import genai
+from jose import JWTError
+from sqlmodel import select
+from game_engine import GameConfig, PLAYER_NAMES, run_round
+from gemini_browser import (
+    STATE_FILE, start_login_flow, confirm_login,
+    shutdown_browser, initialize_browser, init_player_chat, add_player,
+)
+from db import create_tables, get_session, Game, Round, Action, PlayerStack, User
+from auth import hash_password, verify_password, create_token, decode_token
 
 load_dotenv()
 
 _THIS_DIR       = os.path.dirname(os.path.abspath(__file__))
 PERSISTENT_PATH = os.path.join(_THIS_DIR, "database")
 
-# ── Player personalities ──────────────────────────────────────────────────────
-
+# player personalities
 PLAYERS = {
     "Calculator": ("sklansky",  "calculator_prompt.txt"),
     "Shark":      ("negreanu",  "shark_prompt.txt"),
@@ -40,19 +49,18 @@ _client: Optional[object] = None
 if os.getenv("GEMINI_API_KEY"):
     _client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
 
-# ── Browser state ─────────────────────────────────────────────────────────────
+#browser state
 
 _browser_ready        = False
 _initialized_players: set = set()
 
-# ── Active game sessions ──────────────────────────────────────────────────────
+# active game sessions
 # game_id → {stacks, dealer_idx, round_number, stop, task}
 _active_games: dict[int, dict] = {}
 # game_id → asyncio.Queue for events pushed to WebSocket
 _game_queues:  dict[int, asyncio.Queue] = {}
 
-# ── App setup ─────────────────────────────────────────────────────────────────
-
+#app setup
 app = FastAPI()
 app.add_middleware(
     CORSMiddleware,
@@ -62,11 +70,9 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# ── DB init on startup ────────────────────────────────────────────────────────
-
+#db init
 @app.on_event("startup")
 def on_startup():
-    from db import create_tables
     create_tables()
 
 # ── Request models ────────────────────────────────────────────────────────────
@@ -74,17 +80,21 @@ def on_startup():
 class BrowserInitRequest(BaseModel):
     players: list[str] = []
 
+class AuthRequest(BaseModel):
+    username: str
+    password: str
+
 class CreateGameRequest(BaseModel):
     player_count:   int                              = 3
     starting_stack: int                              = 1000
     ai_mode:        Literal["api", "browser", "ollama"] = "ollama"
     ollama_model:   Optional[str]                    = None
     action_speed:   float                            = 1.0   # seconds
+    human_player:   Optional[str]                    = None  # username of human seat
 
 # ── Helper ────────────────────────────────────────────────────────────────────
 
 def _make_config(req: CreateGameRequest):
-    from game_engine import GameConfig
     return GameConfig(
         mode           = req.ai_mode,
         ollama_model   = req.ollama_model,
@@ -95,7 +105,19 @@ def _make_config(req: CreateGameRequest):
         collections    = _collections,
         gemini_client  = _client,
         browser_ready  = [_browser_ready],
+        human_player   = req.human_player,
     )
+
+
+def _get_current_user(authorization: Optional[str]) -> Optional[dict]:
+    """Decode Bearer token → user payload dict, or None if missing/invalid."""
+    if not authorization or not authorization.startswith("Bearer "):
+        return None
+    token = authorization[len("Bearer "):]
+    try:
+        return decode_token(token)
+    except JWTError:
+        return None
 
 async def _emit(game_id: int, event: dict):
     q = _game_queues.get(game_id)
@@ -108,33 +130,63 @@ async def _emit(game_id: int, event: dict):
 def home():
     return {"message": "Poker Backend Running"}
 
-# ── Browser endpoints (unchanged) ─────────────────────────────────────────────
+# ── Auth endpoints ────────────────────────────────────────────────────────────
 
+@app.post("/auth/register")
+def auth_register(req: AuthRequest):
+    if len(req.password) < 8:
+        raise HTTPException(status_code=400, detail="Password must be at least 8 characters")
+    with get_session() as session:
+        existing = session.exec(select(User).where(User.username == req.username)).first()
+        if existing:
+            raise HTTPException(status_code=409, detail="Username already taken")
+        user = User(username=req.username, password_hash=hash_password(req.password))
+        session.add(user)
+        session.commit()
+        session.refresh(user)
+        token = create_token(user.id, user.username)
+    return {"token": token, "username": req.username}
+
+
+@app.post("/auth/login")
+def auth_login(req: AuthRequest):
+    with get_session() as session:
+        user = session.exec(select(User).where(User.username == req.username)).first()
+        if not user or not verify_password(req.password, user.password_hash):
+            raise HTTPException(status_code=401, detail="Invalid username or password")
+        token = create_token(user.id, user.username)
+    return {"token": token, "username": req.username}
+
+
+@app.get("/auth/me")
+def auth_me(authorization: Optional[str] = Header(None)):
+    payload = _get_current_user(authorization)
+    if not payload:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+    return {"id": int(payload["sub"]), "username": payload["username"]}
+
+
+#browser endpoints
 @app.get("/browser/status")
 def browser_status():
     return {"ready": _browser_ready}
 
 @app.get("/browser/session-status")
 def browser_session_status():
-    from gemini_browser import STATE_FILE
     return {"has_session": os.path.exists(STATE_FILE)}
 
 @app.post("/browser/login")
 def browser_login():
-    from gemini_browser import start_login_flow
     start_login_flow()
     return {"status": "login_browser_opened"}
 
 @app.post("/browser/login-confirm")
 async def browser_login_confirm():
-    from gemini_browser import confirm_login
     await asyncio.to_thread(confirm_login)
-    from gemini_browser import STATE_FILE
     return {"status": "session_saved", "has_session": os.path.exists(STATE_FILE)}
 
 @app.delete("/browser/session")
 def browser_clear_session():
-    from gemini_browser import STATE_FILE
     if os.path.exists(STATE_FILE):
         os.remove(STATE_FILE)
         return {"status": "cleared"}
@@ -146,7 +198,6 @@ async def browser_shutdown():
     if not _browser_ready:
         return {"status": "not_initialized"}
     try:
-        from gemini_browser import shutdown_browser
         await asyncio.to_thread(shutdown_browser)
         _browser_ready = False
         _initialized_players = set()
@@ -165,7 +216,6 @@ async def browser_init(body: BrowserInitRequest = None):
     if not new_players:
         return {"status": "already_initialized", "initialized": list(_initialized_players)}
     try:
-        from gemini_browser import initialize_browser, init_player_chat, add_player
         if not _browser_ready:
             await asyncio.to_thread(initialize_browser, new_players)
         else:
@@ -184,13 +234,15 @@ async def browser_init(body: BrowserInitRequest = None):
 # ── Game endpoints ────────────────────────────────────────────────────────────
 
 @app.post("/games")
-def create_game(req: CreateGameRequest):
-    from db import get_session, Game
+def create_game(req: CreateGameRequest, authorization: Optional[str] = Header(None)):
+    current_user = _get_current_user(authorization)
     game = Game(
         player_count   = req.player_count,
         starting_stack = req.starting_stack,
         ai_mode        = req.ai_mode,
         ollama_model   = req.ollama_model,
+        human_player   = req.human_player,
+        user_id        = int(current_user["sub"]) if current_user else None,
     )
     with get_session() as session:
         session.add(game)
@@ -198,8 +250,13 @@ def create_game(req: CreateGameRequest):
         session.refresh(game)
         gid = game.id
 
-    from game_engine import PLAYER_NAMES
-    all_players = PLAYER_NAMES[:req.player_count]
+    if req.human_player:
+        ai_pool     = [p for p in PLAYER_NAMES if p != req.human_player]
+        ai_names    = random.sample(ai_pool, k=req.player_count - 1)
+        all_players = [req.human_player] + ai_names
+    else:
+        all_players = random.sample(PLAYER_NAMES, k=req.player_count)
+
     _active_games[gid] = {
         "stacks":       {p: req.starting_stack for p in all_players},
         "dealer_idx":   0,
@@ -207,6 +264,7 @@ def create_game(req: CreateGameRequest):
         "stop":         False,
         "task":         None,
         "config_req":   req,
+        "action_queue": asyncio.Queue(),
     }
     _game_queues[gid] = asyncio.Queue()
     return {"game_id": gid}
@@ -226,7 +284,6 @@ async def start_next_round(game_id: int):
     config             = _make_config(gs["config_req"])
 
     async def _run():
-        from game_engine import run_round
         try:
             await run_round(
                 game_id      = game_id,
@@ -236,6 +293,7 @@ async def start_next_round(game_id: int):
                 config       = config,
                 stop_check   = lambda: gs["stop"],
                 emit         = lambda e: _emit(game_id, e),
+                action_queue = gs.get("action_queue"),
             )
         except Exception as e:
             await _emit(game_id, {"type": "error", "message": str(e)})
@@ -255,11 +313,15 @@ async def stop_game(game_id: int):
 
 
 @app.get("/games")
-def list_games():
-    from db import get_session, Game, Round
-    from sqlmodel import select
+def list_games(authorization: Optional[str] = Header(None)):
+    current_user = _get_current_user(authorization)
+    if not current_user:
+        return []
+    user_id = int(current_user["sub"])
     with get_session() as session:
-        games = session.exec(select(Game).order_by(Game.created_at.desc())).all()
+        games = session.exec(
+            select(Game).where(Game.user_id == user_id).order_by(Game.created_at.desc())
+        ).all()
         result = []
         for g in games:
             rounds = session.exec(select(Round).where(Round.game_id == g.id)).all()
@@ -279,8 +341,6 @@ def list_games():
 
 @app.get("/games/{game_id}")
 def get_game(game_id: int):
-    from db import get_session, Game, Round, Action, PlayerStack
-    from sqlmodel import select
     with get_session() as session:
         game = session.get(Game, game_id)
         if not game:
@@ -341,8 +401,14 @@ async def game_ws(websocket: WebSocket, game_id: int):
         try:
             while True:
                 msg = await websocket.receive_json()
-                if msg.get("type") == "stop" and game_id in _active_games:
+                if game_id not in _active_games:
+                    continue
+                if msg.get("type") == "stop":
                     _active_games[game_id]["stop"] = True
+                elif msg.get("type") == "human_action":
+                    q = _active_games[game_id].get("action_queue")
+                    if q:
+                        q.put_nowait({"action": msg.get("action"), "amount": msg.get("amount", 0)})
         except (WebSocketDisconnect, Exception):
             pass
 
