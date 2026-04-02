@@ -16,8 +16,7 @@ import db as db_module
 from db import Round, PlayerStack, Action, Game, save_round
 
 
-# ── Fixtures ──────────────────────────────────────────────────────────────────
-
+# Fixtures
 @pytest.fixture()
 def in_memory_engine(monkeypatch):
     """Create a fresh in-memory SQLite engine and patch db module to use it."""
@@ -59,7 +58,7 @@ def minimal_round_data(game_id):
     }
 
 
-# ── Tests ─────────────────────────────────────────────────────────────────────
+# Tests
 
 class TestSaveRound:
     def test_creates_round_record(self, in_memory_engine, game_id):

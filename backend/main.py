@@ -376,13 +376,13 @@ def get_game(game_id: int):
             "rounds":           rounds_out,
         }
 
-# ── WebSocket ─────────────────────────────────────────────────────────────────
+# WebSocket
 
 @app.websocket("/games/{game_id}/ws")
 async def game_ws(websocket: WebSocket, game_id: int):
     await websocket.accept()
 
-    # Ensure queue exists (created by POST /games)
+    # Ensure queue exists
     if game_id not in _game_queues:
         _game_queues[game_id] = asyncio.Queue()
     queue = _game_queues[game_id]
@@ -390,7 +390,7 @@ async def game_ws(websocket: WebSocket, game_id: int):
     async def _send_loop():
         while True:
             event = await queue.get()
-            if event is None:       # sentinel: WS is closing
+            if event is None:
                 break
             try:
                 await websocket.send_json(event)

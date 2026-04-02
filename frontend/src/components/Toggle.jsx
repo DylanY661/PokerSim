@@ -16,7 +16,7 @@ export default function Toggle({ value, onChange, disabled }) {
         padding: 0,
         cursor: 'pointer',
         flexShrink: 0,
-        backgroundColor: value ? '#f59e0b' : '#475569',
+        backgroundColor: value ? '#10b981' : '#d4d4d8',
         transition: 'background-color 0.2s',
       }}
     >

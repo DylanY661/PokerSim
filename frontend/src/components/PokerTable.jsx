@@ -35,7 +35,7 @@ export default function PokerTable() {
   // Clear playAsHuman if user logs out
   const handleLogout = () => { auth.logout(); setPlayAsHuman(false); };
 
-  // ── Game handlers ───────────────────────────────────────────────────────────
+  // Game handlers
 
   const _teardown = async () => {
     game.disconnect();
@@ -156,7 +156,7 @@ export default function PokerTable() {
     );
   }
 
-  // ── Game phase ──────────────────────────────────────────────────────────────
+  // Game phase
 
   const { playerCount, startingStack, mode, showHands, setShowHands } = settings;
   const humanName     = (playAsHuman && auth.user) ? auth.user.username : null;
@@ -196,32 +196,32 @@ export default function PokerTable() {
   });
 
   return (
-    <div className="h-screen bg-slate-900 text-white flex flex-col overflow-hidden">
+    <div className="h-screen bg-[#0a1628] text-zinc-100 flex flex-col overflow-hidden">
 
       {/* Top bar */}
-      <div className="flex items-center gap-2 px-4 py-2.5 border-b border-slate-700 bg-slate-800/80 flex-shrink-0">
+      <div className="flex items-center gap-2 px-4 py-2.5 border-b border-[#162538] bg-[#06101e]/90 flex-shrink-0">
         <button
           onClick={handleEndGame}
           disabled={(game.gameRunning && !stopped) || browser.shuttingDown}
-          className="px-3 py-1.5 rounded-lg bg-white hover:bg-gray-100 disabled:opacity-40 text-sm text-black"
+          className="px-3 py-1.5 rounded bg-[#0d1e30] hover:bg-[#162a40] border border-[#1e3a52] disabled:opacity-40 text-sm text-slate-200"
         >
           ← Settings
         </button>
-        <span className="text-slate-400 text-xs px-2 py-1 rounded bg-slate-800 border border-slate-700">
+        <span className="text-slate-400 text-xs px-2 py-1 rounded-sm bg-[#0d1e30] border border-[#1e3a52]">
           {mode === 'browser' ? 'Browser' : mode === 'api' ? 'API' : 'Ollama'}
         </span>
         {game.roundNumber > 0 && (
-          <span className="text-slate-400 text-xs px-2 py-1 rounded bg-slate-800 border border-slate-700">
+          <span className="text-slate-400 text-xs px-2 py-1 rounded-sm bg-[#0d1e30] border border-[#1e3a52]">
             Round {game.roundNumber}
           </span>
         )}
         {game.gameRunning && !stopped && (
-          <span className="text-amber-400 text-xs px-2 py-1 rounded bg-amber-950/40 border border-amber-700/40">
+          <span className="text-amber-400 text-xs px-2 py-1 rounded-sm bg-amber-950/40 border border-amber-800/40">
             {STREET_LABEL[game.street] ?? game.street}
           </span>
         )}
         {stopped && (
-          <span className="text-blue-300 text-xs px-2 py-1 rounded bg-blue-950/50 border border-blue-700/50">
+          <span className="text-slate-400 text-xs px-2 py-1 rounded-sm bg-[#0d1e30] border border-[#1e3a52]">
             ⏸ Paused
           </span>
         )}
@@ -230,7 +230,7 @@ export default function PokerTable() {
         <div className="ml-auto flex items-center gap-2">
           <button
             onClick={() => setShowHands(h => !h)}
-            className="px-3 py-1.5 rounded-lg bg-white hover:bg-gray-100 text-sm text-black"
+            className="px-3 py-1.5 rounded bg-[#0d1e30] hover:bg-[#162a40] border border-[#1e3a52] text-sm text-slate-200"
           >
             {showHands ? 'Hide Hands' : 'Show Hands'}
           </button>
@@ -239,7 +239,7 @@ export default function PokerTable() {
             <button
               onClick={handleEndGame}
               disabled={browser.shuttingDown}
-              className="px-3 py-1.5 rounded-lg bg-red-600 hover:bg-red-500 disabled:opacity-40 text-sm font-medium text-white"
+              className="px-3 py-1.5 rounded bg-red-700 hover:bg-red-600 disabled:opacity-40 text-sm font-bold text-white"
             >
               Confirm End?
             </button>
@@ -247,7 +247,7 @@ export default function PokerTable() {
             <button
               onClick={() => setConfirmEnd(true)}
               disabled={browser.shuttingDown}
-              className="px-3 py-1.5 rounded-lg bg-white hover:bg-gray-100 disabled:opacity-40 text-sm font-medium text-black"
+              className="px-3 py-1.5 rounded bg-[#0d1e30] hover:bg-[#162a40] border border-[#1e3a52] disabled:opacity-40 text-sm font-medium text-slate-200"
             >
               {browser.shuttingDown ? 'Ending…' : 'End Game'}
             </button>
@@ -256,14 +256,14 @@ export default function PokerTable() {
           {game.gameRunning && !stopped ? (
             <button
               onClick={handleStop}
-              className="px-4 py-1.5 rounded-lg bg-white hover:bg-gray-100 font-semibold text-sm text-black"
+              className="px-4 py-1.5 rounded bg-[#0d1e30] hover:bg-[#162a40] border border-[#1e3a52] font-medium text-sm text-slate-200"
             >
               ⏸ Pause
             </button>
           ) : stopped ? (
             <button
               onClick={handleResume}
-              className="px-4 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-400 font-semibold text-sm text-black"
+              className="px-4 py-1.5 rounded bg-emerald-700 hover:bg-emerald-600 font-bold text-sm text-white"
             >
               ▶ Resume
             </button>
@@ -271,14 +271,14 @@ export default function PokerTable() {
             game.tournamentWinner ? (
               <button
                 onClick={handleEndGame}
-                className="px-4 py-1.5 rounded-lg bg-green-600 hover:bg-green-500 font-semibold text-sm text-white"
+                className="px-4 py-1.5 rounded bg-green-600 hover:bg-green-500 font-bold text-sm text-white"
               >
                 New Game
               </button>
             ) : (
               <button
                 onClick={handleNextRound}
-                className="px-4 py-1.5 rounded-lg bg-white hover:bg-gray-100 font-semibold text-sm text-black"
+                className="px-4 py-1.5 rounded bg-emerald-700 hover:bg-emerald-600 font-bold text-sm text-white"
               >
                 Next Round
               </button>
@@ -286,7 +286,7 @@ export default function PokerTable() {
           ) : (
             <button
               onClick={handleRunGame}
-              className="px-4 py-1.5 rounded-lg bg-white hover:bg-gray-100 font-semibold text-sm text-black"
+              className="px-4 py-1.5 rounded bg-emerald-700 hover:bg-emerald-600 font-bold text-sm text-white"
             >
               ▶ Run Game
             </button>
@@ -309,21 +309,21 @@ export default function PokerTable() {
 
       {/* Human action panel */}
       {game.humanActionRequired && (
-        <div className="flex-shrink-0 bg-slate-800/95 border-t border-amber-600/50 px-4 py-3 flex items-center gap-3">
-          <span className="text-amber-400 text-sm font-semibold">Your turn</span>
-          <span className="text-slate-400 text-xs">
+        <div className="flex-shrink-0 bg-[#06101e] border-t border-emerald-700/50 px-4 py-3 flex items-center gap-3">
+          <span className="text-amber-400 text-sm font-bold font-display">Your turn</span>
+          <span className="text-zinc-400 text-xs">
             To call: ${game.humanActionRequired.toCall} &nbsp;·&nbsp; Stack: ${game.humanActionRequired.stack} &nbsp;·&nbsp; Pot: ${game.humanActionRequired.pot}
           </span>
           <div className="ml-auto flex items-center gap-2">
             <button
               onClick={() => game.sendHumanAction('fold')}
-              className="px-4 py-1.5 rounded-lg bg-white hover:bg-gray-100 text-sm font-medium text-black transition-colors"
+              className="px-4 py-1.5 rounded bg-red-700 hover:bg-red-600 text-sm font-bold text-white transition-colors"
             >
               Fold
             </button>
             <button
               onClick={() => game.sendHumanAction('call')}
-              className="px-4 py-1.5 rounded-lg bg-white hover:bg-gray-100 text-sm font-medium text-black transition-colors"
+              className="px-4 py-1.5 rounded bg-green-700 hover:bg-green-600 text-sm font-bold text-white transition-colors"
             >
               {game.humanActionRequired.toCall === 0 ? 'Check' : `Call $${game.humanActionRequired.toCall}`}
             </button>
@@ -334,7 +334,7 @@ export default function PokerTable() {
               value={raiseAmount}
               onChange={e => setRaiseAmount(e.target.value)}
               placeholder={`Raise (min $${game.humanActionRequired.minRaise})`}
-              className="w-36 bg-slate-700 border border-slate-600 text-white text-xs rounded-lg px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-amber-400"
+              className="w-36 bg-[#0d1e30] border border-[#1e3a52] text-slate-200 text-xs rounded px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-emerald-500"
             />
             <button
               onClick={() => {
@@ -345,7 +345,7 @@ export default function PokerTable() {
                 }
               }}
               disabled={!raiseAmount || parseInt(raiseAmount, 10) < game.humanActionRequired.minRaise}
-              className="px-4 py-1.5 rounded-lg bg-white hover:bg-gray-100 disabled:opacity-40 text-sm font-medium text-black transition-colors"
+              className="px-4 py-1.5 rounded bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40 text-sm font-bold text-white transition-colors"
             >
               Raise
             </button>

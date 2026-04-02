@@ -4,16 +4,16 @@ export default function Card({ rank, suit, faceDown }) {
 
   if (faceDown) {
     return (
-      <div className="w-8 h-11 rounded bg-slate-700 border border-slate-500 flex items-center justify-center text-slate-400 text-[10px]">
-        ?
+      <div className="w-9 h-[52px] rounded-sm bg-zinc-800 border border-zinc-600/60 flex items-center justify-center shadow-sm">
+        <div className="w-5 h-7 rounded-sm border border-zinc-600/40 bg-zinc-700/40" />
       </div>
     );
   }
 
   return (
-    <div className={`w-8 h-11 rounded bg-white border border-slate-300 flex flex-col items-center justify-center text-[10px] shadow-md ${red ? 'text-red-600' : 'text-slate-800'}`}>
-      <span className="font-bold leading-none">{rank}</span>
-      <span className="leading-none">{SYM[suit] || suit}</span>
+    <div className={`w-9 h-[52px] rounded-sm bg-white border border-zinc-200 flex flex-col items-center justify-center shadow-sm ${red ? 'text-red-600' : 'text-zinc-800'}`}>
+      <span className="text-sm font-black leading-none">{rank}</span>
+      <span className="text-base leading-none">{SYM[suit] || suit}</span>
     </div>
   );
 }

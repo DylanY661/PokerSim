@@ -1,13 +1,9 @@
-"""
-auth.py — JWT + password helpers for user authentication.
-"""
 import os
 from datetime import datetime, timedelta
 
 import bcrypt
 from jose import JWTError, jwt
 
-# Falls back to a dev default — set SECRET_KEY env var in production
 SECRET_KEY = os.environ.get("SECRET_KEY", "dev-secret-change-me-in-production")
 ALGORITHM  = "HS256"
 TOKEN_TTL  = timedelta(days=7)
@@ -30,5 +26,5 @@ def create_token(user_id: int, username: str) -> str:
 
 
 def decode_token(token: str) -> dict:
-    """Decode and verify a JWT.  Raises JWTError on invalid/expired tokens."""
+    """Decode and verify a JWT"""
     return jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])

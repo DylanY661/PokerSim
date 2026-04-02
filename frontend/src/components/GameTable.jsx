@@ -7,10 +7,10 @@ export default function GameTable({ seats, communityCards, pot, lastWinner, game
 
       {/* Winner banner */}
       {lastWinner && !gameRunning && (
-        <div className={`w-full max-w-xl px-5 py-3 rounded-xl border text-center flex-shrink-0 ${
+        <div className={`w-full max-w-xl px-5 py-3 rounded-md border text-center flex-shrink-0 shadow-sm ${
           tournamentWinner
-            ? 'bg-green-950/60 border-green-600/50'
-            : 'bg-amber-950/60 border-amber-600/50'
+            ? 'bg-zinc-900/80 border-green-500/60'
+            : 'bg-zinc-900/80 border-amber-500/60'
         }`}>
           <p className={`font-bold text-lg ${tournamentWinner ? 'text-green-300' : 'text-amber-300'}`}>
             🏆 {lastWinner.name} wins${lastWinner.amount > 0 ? ` $${lastWinner.amount.toLocaleString()}` : ''}!
@@ -22,7 +22,7 @@ export default function GameTable({ seats, communityCards, pot, lastWinner, game
             <p className="text-green-400 text-xs mt-0.5 font-semibold">Tournament Champion! 🎉</p>
           ) : (
             <p className="text-amber-500/80 text-xs mt-0.5">
-              Press <span className="text-green-400 font-semibold">Next Round</span> to keep playing with current chip counts.
+              Press <span className="text-amber-400 font-semibold">Next Round</span> to keep playing with current chip counts.
             </p>
           )}
         </div>
@@ -35,10 +35,12 @@ export default function GameTable({ seats, communityCards, pot, lastWinner, game
       >
         {/* Felt oval */}
         <div
-          className="absolute rounded-[50%] border-[12px] border-amber-900 shadow-2xl"
+          className="absolute rounded-[50%] border-[12px]"
           style={{
             inset: '60px 80px',
+            borderColor: '#92400e',
             background: 'radial-gradient(ellipse at center, #166534 0%, #14532d 65%, #0f3d1f 100%)',
+            boxShadow: '0 0 0 4px #78350f, 0 8px 40px rgba(0,0,0,0.7), inset 0 0 60px rgba(0,0,0,0.4)',
           }}
         />
 
@@ -49,7 +51,7 @@ export default function GameTable({ seats, communityCards, pot, lastWinner, game
               ? communityCards.map((c, i) => <Card key={i} {...c} />)
               : [0, 1, 2, 3, 4].map(i => <Card key={i} faceDown />)}
           </div>
-          <div className="px-3 py-1 rounded-full bg-black/60 border border-amber-600/60 text-amber-300 font-bold text-xs">
+          <div className="px-3 py-1 rounded-full bg-black/80 border border-amber-500/70 text-amber-300 font-bold text-xs tabular-nums">
             Pot: ${pot.toLocaleString()}
           </div>
         </div>

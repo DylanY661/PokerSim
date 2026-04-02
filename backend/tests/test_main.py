@@ -1,11 +1,6 @@
 """
 test_main.py — integration-style tests for FastAPI endpoints in main.py.
 
-conftest.py has already patched sys.modules for chromadb / google.genai /
-gemini_browser before this module is imported.
-
-We use httpx.AsyncClient with ASGITransport so requests never hit the network.
-The DB engine is patched to in-memory SQLite so no real poker.db is touched.
 """
 import sys
 import os
@@ -19,16 +14,11 @@ from httpx import AsyncClient, ASGITransport
 import db as db_module
 
 
-# ── DB fixture (in-memory) ────────────────────────────────────────────────────
+# DB fixture (in-memory)
 
 @pytest.fixture(autouse=True)
 def use_in_memory_db(monkeypatch):
     """Redirect all DB access to a fresh in-memory SQLite for each test.
-
-    StaticPool is essential: the default SingletonThreadPool gives each thread
-    its own connection (and thus its own empty database).  ASGI handlers run
-    in a thread-pool executor, so without StaticPool the handler sees a blank
-    database even though create_all() was called in the test thread.
     """
     engine = create_engine(
         "sqlite:///:memory:",
@@ -42,8 +32,7 @@ def use_in_memory_db(monkeypatch):
     return engine
 
 
-# ── App fixture ───────────────────────────────────────────────────────────────
-
+# Fixture
 @pytest.fixture()
 async def client():
     from main import app, _active_games, _game_queues
@@ -53,8 +42,6 @@ async def client():
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as c:
         yield c
 
-
-# ── Health ────────────────────────────────────────────────────────────────────
 
 class TestHealth:
     async def test_health_check(self, client):

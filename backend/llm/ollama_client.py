@@ -11,11 +11,6 @@ OLLAMA_MODEL = os.getenv("OLLAMA_MODEL")
 class OllamaError(Exception):
     pass
 
-"""
-generate() is a helper function to call the Ollama local server's /api/generate endpoint.
-It takes care of formatting the request, handling errors, and parsing the response.
-The response is a JSON string containing the action, amount, and reasoning.
-"""
 def generate(prompt, system_prompt=None, timeout=120, params=None, model=None):
     url = OLLAMA_URL.rstrip("/") + "/api/generate"
 
@@ -23,9 +18,9 @@ def generate(prompt, system_prompt=None, timeout=120, params=None, model=None):
     payload = {
         "model": model or OLLAMA_MODEL,
         "prompt": prompt,
-        "system": system_prompt, # Correct way to send system prompt in /api/generate
+        "system": system_prompt, 
         "format": "json",
-        "stream": False,         # CRITICAL: Prevents the NDJSON streaming error
+        "stream": False,         
     }
     
     if params:

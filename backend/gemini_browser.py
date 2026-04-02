@@ -1,22 +1,13 @@
 """
-gemini_browser.py — Playwright browser automation for Gemini.
-
 Bypasses the Gemini API free-tier rate limit by driving a real Chrome window
 instead of calling the API directly.  Each AI player gets an isolated
-BrowserContext with independent conversation history.  All contexts share the
-same Google login session saved to backend/browser_session/ so the user only
-has to log in once.
+BrowserContext with independent conversation history.
 
-Public API
-----------
-    initialize_browser(player_ids)          # call once before the game
-    init_player_chat(player_id, sys_prompt) # call per player after initialize
-    query_gemini_browser(prompt, player_id) # call each turn
-    shutdown_browser()                      # call after the game ends
+initialize_browser(player_ids)          # call once before the game
+init_player_chat(player_id, sys_prompt) # call per player after initialize
+query_gemini_browser(prompt, player_id) # call each turn
+shutdown_browser()                      # call after the game ends
 
-Note: phantom tabs may briefly appear when Chrome loads Google auth cookies
-into fresh contexts — this is a Chrome-level behaviour outside Playwright's
-control and does not affect functionality.
 """
 
 import asyncio
@@ -25,7 +16,6 @@ import subprocess
 import threading
 from playwright.async_api import async_playwright, Browser, BrowserContext, Page, Playwright
 
-# ── Paths ───────────────────────────────────────────────────────────────────
 _THIS_DIR   = os.path.dirname(os.path.abspath(__file__))
 SESSION_DIR = os.path.join(_THIS_DIR, "browser_session")
 STATE_FILE  = os.path.join(SESSION_DIR, "state.json")
@@ -34,7 +24,8 @@ GEMINI_URL          = "https://gemini.google.com/app"
 RESPONSE_TIMEOUT_MS = 60_000
 NAV_TIMEOUT_MS      = 30_000
 
-# ── Module-level state ──────────────────────────────────────────────────────
+
+# States
 _playwright:      "Playwright | None"           = None
 _browser:         "Browser | None"              = None
 _player_contexts: dict[str, BrowserContext]     = {}
@@ -42,12 +33,10 @@ _player_pages:    dict[str, Page]               = {}
 _loop:            "asyncio.AbstractEventLoop | None" = None
 _loop_thread:     "threading.Thread | None"     = None
 
-# ── Login-flow state (separate from the game loop) ──────────────────────────
 _login_event:     threading.Event               = threading.Event()
 _login_thread:    "threading.Thread | None"     = None
 
 
-# ── Event loop bridge (async Playwright from sync callers) ──────────────────
 
 def _start_event_loop() -> None:
     global _loop
@@ -62,7 +51,7 @@ def _run(coro):
     return asyncio.run_coroutine_threadsafe(coro, _loop).result()
 
 
-# ── Internal helpers ────────────────────────────────────────────────────────
+#Helpers
 
 def _is_login_page(page: Page) -> bool:
     url = page.url
@@ -120,7 +109,7 @@ async def _focus_and_clear_input(page: Page) -> None:
 
 
 async def _inject_text(page: Page, text: str) -> None:
-    """Paste text via macOS clipboard to avoid newlines triggering early submit."""
+    """Paste text via clipboard to avoid newlines triggering early submit."""
     await asyncio.to_thread(
         subprocess.run, ["pbcopy"], input=text.encode("utf-8"), check=True
     )
@@ -184,7 +173,7 @@ async def _extract_last_response(page: Page, player_id: str) -> str:
     )
 
 
-# ── Async implementations ────────────────────────────────────────────────────
+# Async FUnctions
 
 async def _async_initialize_browser(player_ids: list[str]) -> None:
     global _playwright, _browser, _player_contexts, _player_pages
@@ -341,7 +330,7 @@ async def _async_add_player(player_id: str) -> None:
     print(f"[GeminiBrowser] Ready: {player_id}")
 
 
-# ── Public sync API ──────────────────────────────────────────────────────────
+# Public Functions
 
 def start_login_flow() -> None:
     """Open a headed Chrome window so the user can sign into Gemini. Non-blocking."""

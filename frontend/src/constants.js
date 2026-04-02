@@ -31,28 +31,28 @@ export const ACTION_TEXT = {
   fold:   'text-red-400',
   call:   'text-yellow-400',
   raise:  'text-green-400',
-  blind:  'text-slate-400',
+  blind:  'text-zinc-400',
   wins:   'text-amber-300',
   result: 'text-amber-300',
   error:  'text-orange-400',
-  bust:   'text-slate-400',
+  bust:   'text-zinc-400',
 };
 
 export const ACTION_BADGE = {
-  fold:  'bg-red-900/60 border-red-500/40',
-  call:  'bg-yellow-900/60 border-yellow-500/40',
-  raise: 'bg-green-900/60 border-green-500/40',
+  fold:  'bg-red-950/30 border-red-500/50',
+  call:  'bg-yellow-950/30 border-yellow-500/50',
+  raise: 'bg-green-950/30 border-green-500/50',
 };
 
 export const ACTION_ROW = {
-  fold:   'bg-red-950/40 border-red-800/40',
-  call:   'bg-yellow-950/40 border-yellow-800/40',
-  raise:  'bg-green-950/40 border-green-800/40',
-  blind:  'bg-slate-800/60 border-slate-700',
-  wins:   'bg-amber-950/40 border-amber-700/40',
-  result: 'bg-amber-950/40 border-amber-700/40',
-  error:  'bg-orange-950/40 border-orange-800/40',
-  bust:   'bg-slate-800/60 border-slate-700',
+  fold:   'border-l-red-500',
+  call:   'border-l-yellow-400',
+  raise:  'border-l-green-500',
+  blind:  'border-l-zinc-600',
+  wins:   'border-l-amber-400',
+  result: 'border-l-amber-400',
+  error:  'border-l-orange-500',
+  bust:   'border-l-zinc-600',
 };
 
 export const OLLAMA_MODELS = [

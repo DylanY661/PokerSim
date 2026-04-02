@@ -1,11 +1,3 @@
-"""
-game_engine.py — Backend game loop, hand evaluator, and AI action dispatch.
-
-All game logic that previously lived in the React frontend now lives here.
-The `run_round` coroutine drives a complete poker round and streams events
-to the caller via an `emit` async callable.
-"""
-
 import asyncio
 import json
 import random
@@ -17,17 +9,12 @@ from gemini_browser import query_gemini_browser
 from llm.ollama_client import generate as ollama_generate, OllamaError
 from db import save_round as db_save_round
 
-
-# ── Constants ─────────────────────────────────────────────────────────────────
-
 RANKS        = ['2', '3', '4', '5', '6', '7', '8', '9', 'T', 'J', 'Q', 'K', 'A']
 SUITS        = ['S', 'H', 'D', 'C']
 RANK_VAL     = {r: i + 2 for i, r in enumerate(RANKS)}
 PLAYER_NAMES = ['Calculator', 'Shark', 'Gambler', 'Maniac', 'Rock']
 
-
-# ── Game config ───────────────────────────────────────────────────────────────
-
+#config
 @dataclass
 class GameConfig:
     mode:             str                    # "ollama" | "api" | "browser"
@@ -50,16 +37,14 @@ class GameConfig:
         return self.sb * 2
 
 
-# ── Deck ──────────────────────────────────────────────────────────────────────
-
+# deck
 def shuffled_deck() -> list[dict]:
     deck = [{'rank': r, 'suit': s} for r in RANKS for s in SUITS]
     random.shuffle(deck)
     return deck
 
 
-# ── Hand evaluator ────────────────────────────────────────────────────────────
-
+# hand eval
 def _rank_five(cards: list[dict]) -> dict:
     vals   = sorted([RANK_VAL[c['rank']] for c in cards], reverse=True)
     suits  = [c['suit'] for c in cards]
@@ -121,8 +106,7 @@ def best_hand_of_7(cards: list[dict]) -> Optional[dict]:
     return best
 
 
-# ── AI action ─────────────────────────────────────────────────────────────────
-
+# AI actions
 def _format_state(state: dict) -> str:
     def fmt(c): return f"{c.get('rank','?')}{c.get('suit','?')}"
     hole      = ", ".join(fmt(c) for c in state.get("hole_cards", []))
@@ -201,9 +185,9 @@ async def get_ai_action(player: str, state: dict, config: GameConfig) -> dict:
     resp = await asyncio.to_thread(_call_api)
     return _parse_response(resp.text)
 
+# Street
 
-# ── Betting street ────────────────────────────────────────────────────────────
-
+#Manages a street of poker round
 async def _run_street(
     players:        list[str],
     stacks:         dict,
@@ -326,22 +310,19 @@ async def _run_street(
     return {"stacks": s, "pot": p, "still_active": still_active, "all_in": list(all_in)}
 
 
-# ── Round ─────────────────────────────────────────────────────────────────────
+# Round
 
+#Manages a full round of poker
 async def run_round(
     game_id:        int,
     round_number:   int,
-    game_stacks:    dict,           # ALL players in game (including busted at 0)
+    game_stacks:    dict,   
     dealer_idx:     int,
     config:         GameConfig,
     stop_check:     Callable[[], bool],
     emit:           Callable[[dict], Awaitable[None]],
     action_queue=None,
 ):
-    """
-    Drive a complete poker round.  Updates game_stacks in-place and emits
-    round_end (and optionally game_end) when done.  Saves to DB.
-    """
     players = [p for p in game_stacks if game_stacks[p] > 0]
 
     # Tournament already decided
