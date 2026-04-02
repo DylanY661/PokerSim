@@ -62,6 +62,11 @@ export async function getMe(token) {
   return data;  // { id, username }
 }
 
+export async function loginWithGoogle(credential) {
+  const { data } = await axios.post(`${API_BASE}/auth/google`, { credential });
+  return data;  // { token, username }
+}
+
 // ── Game API ──────────────────────────────────────────────────────────────────
 
 export async function createGame({ playerCount, startingStack, aiMode, ollamaModel, actionSpeed, humanPlayer, token }) {

@@ -124,6 +124,7 @@ export default function PokerTable() {
             onClose={() => setShowAuthModal(false)}
             onLogin={auth.login}
             onRegister={auth.register}
+            onLoginGoogle={auth.loginGoogle}
           />
         )}
       </>
@@ -150,6 +151,7 @@ export default function PokerTable() {
             onClose={() => setShowAuthModal(false)}
             onLogin={auth.login}
             onRegister={auth.register}
+            onLoginGoogle={auth.loginGoogle}
           />
         )}
       </>

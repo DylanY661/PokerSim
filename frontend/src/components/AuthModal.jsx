@@ -1,6 +1,7 @@
 import { useState } from 'react';
+import { GoogleLogin } from '@react-oauth/google';
 
-export default function AuthModal({ onClose, onLogin, onRegister }) {
+export default function AuthModal({ onClose, onLogin, onRegister, onLoginGoogle }) {
   const [tab,      setTab]      = useState('login');
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
@@ -31,6 +32,20 @@ export default function AuthModal({ onClose, onLogin, onRegister }) {
     }
   };
 
+  const handleGoogleSuccess = async ({ credential }) => {
+    setError(null);
+    setLoading(true);
+    try {
+      await onLoginGoogle(credential);
+      onClose();
+    } catch (err) {
+      const detail = err?.response?.data?.detail;
+      setError(detail || 'Google sign-in failed');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <div
       className="fixed inset-0 bg-black/70 flex items-center justify-center z-50"
@@ -45,11 +60,29 @@ export default function AuthModal({ onClose, onLogin, onRegister }) {
               key={t}
               onClick={() => { setTab(t); setError(null); setPassword(''); }}
               className={`flex-1 py-1.5 rounded text-sm font-medium transition-colors
-                ${tab === t ? 'bg-zinc-900 text-white' : 'text-zinc-600 hover:bg-zinc-200'}`}
+                ${tab === t ? 'bg-emerald-700 text-white' : 'text-zinc-600 hover:bg-zinc-200'}`}
             >
               {t === 'login' ? 'Sign In' : 'Register'}
             </button>
           ))}
+        </div>
+
+        {/* Google sign-in */}
+        <div className="flex flex-col items-center gap-2 mb-4">
+          <GoogleLogin
+            onSuccess={handleGoogleSuccess}
+            onError={() => setError('Google sign-in failed')}
+            theme="outline"
+            size="large"
+            width="100%"
+            text={tab === 'login' ? 'signin_with' : 'signup_with'}
+          />
+        </div>
+
+        <div className="flex items-center gap-3 mb-4">
+          <div className="flex-1 h-px bg-zinc-200" />
+          <span className="text-zinc-400 text-xs">or</span>
+          <div className="flex-1 h-px bg-zinc-200" />
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-3">
@@ -61,7 +94,7 @@ export default function AuthModal({ onClose, onLogin, onRegister }) {
               onChange={e => setUsername(e.target.value)}
               required
               autoFocus
-              className="mt-1 w-full bg-zinc-50 border border-zinc-300 text-zinc-900 text-sm rounded px-3 py-2 focus:outline-none focus:ring-1 focus:ring-amber-500"
+              className="mt-1 w-full bg-zinc-50 border border-zinc-300 text-zinc-900 text-sm rounded px-3 py-2 focus:outline-none focus:ring-1 focus:ring-emerald-500"
             />
           </div>
           <div>
@@ -71,7 +104,7 @@ export default function AuthModal({ onClose, onLogin, onRegister }) {
               value={password}
               onChange={e => setPassword(e.target.value)}
               required
-              className="mt-1 w-full bg-zinc-50 border border-zinc-300 text-zinc-900 text-sm rounded px-3 py-2 focus:outline-none focus:ring-1 focus:ring-amber-500"
+              className="mt-1 w-full bg-zinc-50 border border-zinc-300 text-zinc-900 text-sm rounded px-3 py-2 focus:outline-none focus:ring-1 focus:ring-emerald-500"
             />
             {tab === 'register' && (
               <p className="text-zinc-500 text-xs mt-1">At least 8 characters</p>

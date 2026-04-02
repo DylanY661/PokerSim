@@ -3,6 +3,8 @@ from datetime import datetime, timedelta
 
 import bcrypt
 from jose import JWTError, jwt
+from google.oauth2 import id_token as google_id_token
+from google.auth.transport import requests as google_requests
 
 SECRET_KEY = os.environ.get("SECRET_KEY", "dev-secret-change-me-in-production")
 ALGORITHM  = "HS256"
@@ -28,3 +30,10 @@ def create_token(user_id: int, username: str) -> str:
 def decode_token(token: str) -> dict:
     """Decode and verify a JWT"""
     return jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+
+
+def verify_google_token(credential: str, client_id: str) -> dict:
+    """Verify a Google ID token and return its payload (sub, email, name, ...)."""
+    return google_id_token.verify_oauth2_token(
+        credential, google_requests.Request(), client_id
+    )

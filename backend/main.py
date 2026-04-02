@@ -16,12 +16,13 @@ from gemini_browser import (
     STATE_FILE, start_login_flow, confirm_login,
     shutdown_browser, initialize_browser, init_player_chat, add_player,
 )
-from db import create_tables, get_session, Game, Round, Action, PlayerStack, User
-from auth import hash_password, verify_password, create_token, decode_token
+from db import create_tables, migrate_db, get_session, Game, Round, Action, PlayerStack, User
+from auth import hash_password, verify_password, create_token, decode_token, verify_google_token
 
 load_dotenv()
 
-_THIS_DIR       = os.path.dirname(os.path.abspath(__file__))
+GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID")
+_THIS_DIR        = os.path.dirname(os.path.abspath(__file__))
 PERSISTENT_PATH = os.path.join(_THIS_DIR, "database")
 
 # player personalities
@@ -73,6 +74,7 @@ app.add_middleware(
 #db init
 @app.on_event("startup")
 def on_startup():
+    migrate_db()
     create_tables()
 
 # ── Request models ────────────────────────────────────────────────────────────
@@ -83,6 +85,9 @@ class BrowserInitRequest(BaseModel):
 class AuthRequest(BaseModel):
     username: str
     password: str
+
+class GoogleAuthRequest(BaseModel):
+    credential: str
 
 class CreateGameRequest(BaseModel):
     player_count:   int                              = 3
@@ -164,6 +169,39 @@ def auth_me(authorization: Optional[str] = Header(None)):
     if not payload:
         raise HTTPException(status_code=401, detail="Not authenticated")
     return {"id": int(payload["sub"]), "username": payload["username"]}
+
+
+@app.post("/auth/google")
+def auth_google(req: GoogleAuthRequest):
+    if not GOOGLE_CLIENT_ID:
+        raise HTTPException(status_code=501, detail="Google auth not configured — set GOOGLE_CLIENT_ID in .env")
+    try:
+        payload = verify_google_token(req.credential, GOOGLE_CLIENT_ID)
+    except Exception:
+        raise HTTPException(status_code=401, detail="Invalid Google credential")
+
+    google_sub = payload["sub"]
+    email      = payload.get("email", "")
+    name       = payload.get("name", "")
+
+    with get_session() as session:
+        user = session.exec(select(User).where(User.google_id == google_sub)).first()
+
+        if not user:
+            # Derive a username from the Google display name or email prefix
+            raw  = (name or email.split("@")[0]).lower().replace(" ", "_")
+            base = "".join(c for c in raw if c.isalnum() or c == "_")[:20] or "user"
+            username = base
+            if session.exec(select(User).where(User.username == username)).first():
+                username = f"{base}_{google_sub[:6]}"
+            user = User(username=username, google_id=google_sub, email=email)
+            session.add(user)
+            session.commit()
+            session.refresh(user)
+
+        token = create_token(user.id, user.username)
+
+    return {"token": token, "username": user.username}
 
 
 #browser endpoints

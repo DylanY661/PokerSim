@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { loginUser, registerUser, getMe } from '../api';
+import { loginUser, registerUser, getMe, loginWithGoogle } from '../api';
 
 const TOKEN_KEY = 'pk_token';
 
@@ -34,11 +34,19 @@ export function useAuth() {
     return data;
   }, []);
 
+  const loginGoogle = useCallback(async (credential) => {
+    const data = await loginWithGoogle(credential);
+    localStorage.setItem(TOKEN_KEY, data.token);
+    setToken(data.token);
+    setUser({ username: data.username });
+    return data;
+  }, []);
+
   const logout = useCallback(() => {
     localStorage.removeItem(TOKEN_KEY);
     setToken(null);
     setUser(null);
   }, []);
 
-  return { user, token, loading, login, register, logout };
+  return { user, token, loading, login, register, loginGoogle, logout };
 }

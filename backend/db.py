@@ -12,7 +12,9 @@ engine       = create_engine(DATABASE_URL, echo=False)
 class User(SQLModel, table=True):
     id:            Optional[int] = Field(default=None, primary_key=True)
     username:      str           = Field(unique=True, index=True)
-    password_hash: str
+    password_hash: Optional[str] = Field(default=None)  # None for OAuth-only accounts
+    google_id:     Optional[str] = Field(default=None, unique=True, index=True)
+    email:         Optional[str] = Field(default=None)
     created_at:    datetime      = Field(default_factory=datetime.utcnow)
 
 
@@ -63,6 +65,54 @@ class Action(SQLModel, table=True):
 
 def create_tables():
     SQLModel.metadata.create_all(engine)
+
+
+def migrate_db():
+    """Migrate existing DB schema — safe to run on every startup."""
+    import sqlite3
+    db_path = os.path.join(_THIS_DIR, 'poker.db')
+    if not os.path.exists(db_path):
+        return
+    conn = sqlite3.connect(db_path)
+    cur = conn.cursor()
+
+    cur.execute("PRAGMA table_info(user)")
+    col_info = {row[1]: row for row in cur.fetchall()}
+
+    # Add new columns if missing
+    if 'google_id' not in col_info:
+        cur.execute("ALTER TABLE user ADD COLUMN google_id TEXT")
+    if 'email' not in col_info:
+        cur.execute("ALTER TABLE user ADD COLUMN email TEXT")
+
+    # SQLite doesn't support ALTER COLUMN — if password_hash is still NOT NULL,
+    # recreate the table so OAuth users (password_hash=NULL) can be inserted.
+    cur.execute("PRAGMA table_info(user)")
+    ph_row = next((r for r in cur.fetchall() if r[1] == 'password_hash'), None)
+    if ph_row and ph_row[3] == 1:  # notnull flag
+        cur.executescript("""
+            PRAGMA foreign_keys = OFF;
+            ALTER TABLE user RENAME TO _user_old;
+            CREATE TABLE user (
+                id            INTEGER PRIMARY KEY,
+                username      VARCHAR NOT NULL,
+                password_hash VARCHAR,
+                google_id     TEXT,
+                email         TEXT,
+                created_at    DATETIME NOT NULL
+            );
+            CREATE UNIQUE INDEX IF NOT EXISTS ix_user_username  ON user (username);
+            CREATE UNIQUE INDEX IF NOT EXISTS ix_user_google_id ON user (google_id);
+            INSERT INTO user (id, username, password_hash, google_id, email, created_at)
+                SELECT id, username, password_hash,
+                       NULL as google_id, NULL as email, created_at
+                FROM _user_old;
+            DROP TABLE _user_old;
+            PRAGMA foreign_keys = ON;
+        """)
+
+    conn.commit()
+    conn.close()
 
 
 def get_session() -> Session:
